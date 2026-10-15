@@ -44,7 +44,7 @@ except Exception:
     pass
 
 # ------------------------------------------------------------------ 常量
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 PACK_FORMAT = "minimax-h3-director-pack"
 PACK_VERSION = 1
 DEFAULT_TASK = "r2v"
@@ -420,7 +420,7 @@ def list_projects(root):
     return {"ok": True, "projects": items}
 
 def _mat_brief(m):
-    return {"name": m.get("name"), "decided_by": m.get("decided_by", "unknown")}
+    return {"name": m.get("name"), "decided_by": m.get("decided_by", "unknown"), "file": m.get("file")}
 
 def show_project(root, name, group=None):
     proj = _load(root, name)
@@ -444,6 +444,8 @@ def show_project(root, name, group=None):
             "loras": [r.get("name") for r in g.get("loras", [])],
             "start_image": (g.get("start_image") or {}).get("name") if isinstance(g.get("start_image"), dict) else None,
             "end_image": (g.get("end_image") or {}).get("name") if isinstance(g.get("end_image"), dict) else None,
+            "start_image_file": (g.get("start_image") or {}).get("file") if isinstance(g.get("start_image"), dict) else None,
+            "end_image_file": (g.get("end_image") or {}).get("file") if isinstance(g.get("end_image"), dict) else None,
         } for g in proj.get("groups", [])],
     }
     if group:
@@ -1979,6 +1981,10 @@ section.on{display:block}
 .chk{display:flex;gap:5px;align-items:center}
 .chip{display:inline-block;background:var(--panel2);border:1px solid var(--bd);border-radius:999px;padding:2px 10px;margin:2px}
 .drop{outline:2px dashed var(--acc)!important;outline-offset:2px;background:#1b2530!important}
+.mats{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:6px}
+.mat{display:flex;flex-direction:column;gap:3px;align-items:center;font-size:11px;color:var(--mut);max-width:130px;word-break:break-all;text-align:center}
+.mat img.thumb,.mat video.thumb{height:68px;max-width:120px;border-radius:5px;border:1px solid var(--bd);object-fit:cover;cursor:pointer;background:#000}
+.mat audio{width:150px}
 .warn{color:#d29922}.err{color:var(--err)}.ok{color:var(--ok)}
 pre{white-space:pre-wrap;word-break:break-word;background:var(--panel2);border:1px solid var(--bd);border-radius:6px;padding:10px;max-height:50vh;overflow:auto}
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#000c;border:1px solid var(--bd);padding:8px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50}
@@ -2020,7 +2026,8 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mu
       </div>
     </div>
     <div class="card">
-      <div class="row"><b>公共素材</b><span class="muted" id="commonMats">（无）</span></div>
+      <div class="row"><b>公共素材</b><span class="muted" id="commonMatsNote"></span></div>
+      <div class="mats" id="commonMats"></div>
       <div class="row">
         <label class="f">角色<select id="commonRole"><option value="ref">ref</option><option value="start">start</option><option value="end">end</option></select></label>
         <label class="f">素材名<input id="commonMatName" placeholder="可空"></label>
@@ -2142,18 +2149,38 @@ function pickFile(accept,cb){const i=document.createElement('input');i.type='fil
 function makeDrop(el,onFile){if(!el)return;el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drop');});el.addEventListener('dragleave',()=>el.classList.remove('drop'));el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drop');const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)onFile(f);});}
 async function loadTextTo(ta,f){ta.value=await f.text();toast('已导入文件内容到文本框（记得保存）');}
 async function addMaterialFile(scope,gid,f,role,mname){toast('上传中…');const up=await uploadFile(f);if(!up.ok){toast(up.error,true);return;}const a={project:S.project,file:up.path,scope:scope,mname:(mname||f.name),role:role};if(scope==='group')a.group=gid;const r=await api('add-material',a);if(r.ok){toast('已加素材');refreshShow();}else toast(r.error,true);}
+function assetUrl(rel){return '/asset?project='+encodeURIComponent(S.project||'')+'&rel='+encodeURIComponent(rel);}
+function matEl(kind,name,rel,label){
+  const wrap=document.createElement('div');wrap.className='mat';
+  const url=assetUrl(rel);
+  if(kind==='image'){const a=document.createElement('a');a.href=url;a.target='_blank';const im=document.createElement('img');im.className='thumb';im.loading='lazy';im.src=url;im.alt=name||'';a.appendChild(im);wrap.appendChild(a);}
+  else if(kind==='video'){const v=document.createElement('video');v.className='thumb';v.src=url;v.controls=true;v.preload='metadata';v.muted=true;wrap.appendChild(v);}
+  else if(kind==='audio'){const au=document.createElement('audio');au.src=url;au.controls=true;wrap.appendChild(au);}
+  const s=document.createElement('div');s.textContent=(label?label+' ':'')+(name||'');wrap.appendChild(s);
+  return wrap;
+}
+function renderMats(el,obj,withFrames){
+  if(!el)return; el.innerHTML=''; obj=obj||{};
+  const add=(kind,arr)=>{ (arr||[]).forEach(m=>{ if(m&&m.file) el.appendChild(matEl(kind,m.name,m.file,'')); }); };
+  add('image',obj.images); add('video',obj.videos); add('audio',obj.audios);
+  if(withFrames){
+    if(obj.start_image_file) el.appendChild(matEl('image',obj.start_image||'首帧',obj.start_image_file,'首帧'));
+    if(obj.end_image_file) el.appendChild(matEl('image',obj.end_image||'尾帧',obj.end_image_file,'尾帧'));
+  }
+  if(!el.children.length){ const e=document.createElement('span');e.className='muted';e.textContent='（无素材）';el.appendChild(e); }
+}
 function badge(st){const el=$('#vlmBadge');if(st&&st.health){el.textContent='VLM: 在线';el.className='ok';}else{el.textContent='VLM: 离线';el.className='warn';}}
 async function reloadProjects(){const r=await api('list');const sel=$('#projectSel');const cur=S.project||sel.value;sel.innerHTML='<option value="">（选择工程）</option>'+(r.projects||[]).map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+' ['+esc(p.task_type)+'] '+p.groups+'段</option>').join('');if(cur)sel.value=cur;}
 async function openProject(name){if(!name){S.project=null;S.show=null;$('#groups').innerHTML='';return;}S.project=name;await refreshShow();}
 async function refreshShow(){if(!S.project)return;const r=await api('show',{project:S.project});if(r.ok){S.show=r;renderCommon();renderGroups();renderOutput();}else toast(r.error,true);}
-function renderCommon(){const sh=(S.show&&S.show.shared)||{};$('#commonPrompt').value=sh.prompt||'';$('#commonEnabled').checked=sh.common_enabled!==false;const a=[];(sh.images||[]).forEach(m=>a.push('图 '+m.name));(sh.videos||[]).forEach(m=>a.push('视频 '+m.name));(sh.audios||[]).forEach(m=>a.push('音频 '+m.name));$('#commonMats').textContent=a.join('，')||'（无）';}
+function renderCommon(){const sh=(S.show&&S.show.shared)||{};$('#commonPrompt').value=sh.prompt||'';$('#commonEnabled').checked=sh.common_enabled!==false;renderMats($('#commonMats'),sh,false);}
 async function saveCommon(){const r=await api('set-common',{project:S.project,prompt:$('#commonPrompt').value,enable:$('#commonEnabled').checked?'on':'off'});if(r.ok){toast('公共参数已保存');refreshShow();}else toast(r.error,true);}
 function matsLine(g){const a=[];(g.images||[]).forEach(m=>a.push('图 '+m.name));(g.videos||[]).forEach(m=>a.push('视频 '+m.name));(g.audios||[]).forEach(m=>a.push('音频 '+m.name));if(g.start_image)a.push('首帧 '+g.start_image);if(g.end_image)a.push('尾帧 '+g.end_image);return a.join('，')||'（无）';}
 function renderGroups(){const box=$('#groups');if(!S.show){box.innerHTML='';return;}box.innerHTML='';(S.show.groups||[]).forEach((g,idx)=>{const gid=g.id;const card=document.createElement('div');card.className='card';card.dataset.gid=gid;
 card.innerHTML='<div class="row"><b>'+(idx+1)+'.</b><input class="gname" placeholder="段名" value="'+esc(g.name)+'"><label>时长 <input class="gdur" type="number" step="0.5" min="0.5" style="width:80px" value="'+(g.duration_sec||5)+'"></label><span class="muted">'+g.frame_count+'帧 · '+gid+'</span><label class="chk"><input class="gprev" type="checkbox" '+(g.continuity_from_prev?'checked':'')+'> 接上一段</label></div>'
 +'<textarea class="gprompt" placeholder="分段提示词（可多行；可直接拖入 .txt 文件到此处）">'+esc(g.prompt)+'</textarea>'
 +'<div class="row"><button class="btn ghost sm imp">导入文件</button><button class="btn sm save">保存本段</button><button class="btn ghost sm opt">优化</button><button class="btn ghost sm rev">反推</button><button class="btn ghost sm del">删除</button></div>'
-+'<div class="row"><select class="mrole"><option value="ref">ref</option><option value="start">start</option><option value="end">end</option></select><input class="mname" placeholder="素材名（可空）"><button class="btn ghost sm mat">加素材(上传)</button><span class="muted">'+esc(matsLine(g))+'</span></div>'
++'<div class="row"><select class="mrole"><option value="ref">ref</option><option value="start">start</option><option value="end">end</option></select><input class="mname" placeholder="素材名（可空）"><button class="btn ghost sm mat">加素材(上传)</button><div class="mats gmats"></div></div>'
 +'<div class="row"><input class="lora" placeholder="LoRA name=strength"><button class="btn ghost sm loraAdd">追加LoRA</button><button class="btn ghost sm loraClr">清空LoRA</button><span class="muted">'+esc((g.loras||[]).join(', ')||'（无LoRA）')+'</span></div>';
 card.querySelector('.imp').onclick=()=>pickFile('.txt,.md,text/plain',f=>loadTextTo(card.querySelector('.gprompt'),f));
 makeDrop(card.querySelector('.gprompt'),f=>loadTextTo(card.querySelector('.gprompt'),f));
@@ -2167,6 +2194,7 @@ card.querySelector('.mat').onclick=()=>pickFile('image/*,video/*,audio/*',f=>add
 makeDrop(card.querySelector('.mat'),f=>addMaterialFile('group',gid,f,card.querySelector('.mrole').value,card.querySelector('.mname').value));
 card.querySelector('.loraAdd').onclick=async()=>{const v=card.querySelector('.lora').value.trim();if(!v)return;const r=await api('set-group',{project:S.project,group:gid,lora:[v]});if(r.ok){toast('已追加LoRA');refreshShow();}else toast(r.error,true);};
 card.querySelector('.loraClr').onclick=async()=>{const r=await api('set-group',{project:S.project,group:gid,lora_clear:true});if(r.ok){toast('已清空LoRA');refreshShow();}else toast(r.error,true);};
+renderMats(card.querySelector('.gmats'),g,true);
 box.appendChild(card);});}
 async function saveGroup(card,gid){const r=await api('set-group',groupArgs(card,gid));if(r.ok){toast('已保存');refreshShow();}else toast(r.error,true);}
 function groupArgs(card,gid){const dur=parseFloat(card.querySelector('.gdur').value);return {project:S.project,group:gid,gname:card.querySelector('.gname').value,prompt:card.querySelector('.gprompt').value,duration:(isNaN(dur)?undefined:dur),from_prev:card.querySelector('.gprev').checked?'on':'off'};}
@@ -2247,7 +2275,9 @@ $('#testVlm').onclick=testVlm;
 $('#testApi').onclick=testApi;
 $('#startVlm2').onclick=async()=>{toast('启动VLM中…（首次加载模型较慢）');const r=await api('vlm',{action:'start'});toast(r.ok?'VLM已就绪':(r.error||'启动失败'),!r.ok);badge(await api('vlm',{action:'status'}));};
 $('#stopVlm2').onclick=async()=>{const r=await api('vlm',{action:'stop'});toast(r.ok?(r.stopped?'已关闭本工具启动的VLM':'没有由本工具启动的VLM'):(r.error||'停止失败'),!r.ok);badge(await api('vlm',{action:'status'}));};
-(async()=>{try{const st=await api('vlm',{action:'status'});badge(st);}catch(e){}await reloadProjects();try{await loadSettings();}catch(e){}})();
+(async()=>{try{const st=await api('vlm',{action:'status'});badge(st);}catch(e){}await reloadProjects();try{await loadSettings();}catch(e){}
+  try{const h=new URLSearchParams((location.hash||'').replace(/^#/,''));const p=h.get('project');if(p){const sel=$('#projectSel');sel.value=p;await openProject(p);}const t=h.get('tab');if(t){const b=document.querySelector('.tabs button[data-tab="'+t+'"]');if(b)b.click();}}catch(e){}
+})();
 </script></body></html>'''
 
 
@@ -2273,9 +2303,30 @@ def serve(host, port, open_browser=False):
             self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
             self.send_header("Pragma", "no-cache")
             self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        def _serve_asset(self):
+            import mimetypes
+            q = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+            project = (q.get("project") or [""])[0]
+            rel = (q.get("rel") or [""])[0]
+            if not project or not rel:
+                self._send({"ok": False, "error": "need project & rel"}, 400); return
+            base = _project_dir(DEFAULT_ROOT, project).resolve()
+            f = (base / rel).resolve()
+            try:
+                f.relative_to(base)
+            except Exception:
+                self._send({"ok": False, "error": "forbidden"}, 403); return
+            if not f.is_file():
+                self._send({"ok": False, "error": "not found", "rel": rel}, 404); return
+            data = f.read_bytes()
+            ctype = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+            self.send_response(200); self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-cache"); self.send_header("Content-Length", str(len(data)))
+            self.end_headers(); self.wfile.write(data)
         def do_GET(self):
             path = self.path.split("?")[0]
             if path in ("/", "/ui", "/index.html"): self._send_html(WEB_UI_HTML)
+            elif path == "/asset": self._serve_asset()
             elif path in ("/help", "/api"): self._send(HELP)
             elif path == "/favicon.ico": self._send({}, 204)
             else: self._send({"ok": False, "error": "not found"}, 404)
