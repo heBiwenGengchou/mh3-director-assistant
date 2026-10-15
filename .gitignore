@@ -1,0 +1,29 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 用户数据 / 运行时产物（不要提交）----
+mh3_director/projects/
+mh3_director/exports/
+mh3_director/_uploads/
+mh3_director/*.log
+mh3_director/.vlm.pid
+*.mmxpack.zip
+
+# ---- 本地配置（可能含 API Key）----
+mh3_director/config.json
+
+# ---- 打包产物 ----
+build/
+dist/
+*.spec
+
+# ---- 便携 Python 运行时（如误放入）----
+mh3_director/python/
+
+# ---- 杂项 ----
+reverse_prompt/__pycache__/
+reverse_prompt/*.bak

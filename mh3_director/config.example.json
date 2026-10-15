@@ -1,0 +1,36 @@
+{
+  "enhance": {
+    "backend": "auto",
+    "target": "h3",
+    "media_dirs": [],
+    "vlm": {
+      "python": "",
+      "script": "",
+      "server": "http://127.0.0.1:8080",
+      "model": "",
+      "api_key": "",
+      "auto_start": false,
+      "auto_stop": true,
+      "launch": {
+        "exe": "",
+        "cwd": "",
+        "startup_timeout": 480,
+        "args": []
+      }
+    },
+    "api": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "",
+      "model": "",
+      "no_template_kwargs": true
+    },
+    "director": {
+      "url": "http://127.0.0.1:8188",
+      "llm_url": "",
+      "model": "",
+      "api_format": "openai_compat",
+      "api_key": "",
+      "output_language": "en"
+    }
+  }
+}
