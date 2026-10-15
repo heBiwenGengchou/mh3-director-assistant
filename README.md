@@ -28,8 +28,9 @@
 ### 方式 A：下载可执行文件（推荐）
 到本仓库的 **Releases** 页面下载：
 
-- `导演包生成小助手.exe` —— 无控制台，双击即打开网页界面。
-- `导演包生成小助手(带控制台).exe` —— 保留控制台窗口，便于查看日志。
+- `DirectorAssistant-v0.7.0-win64.exe` —— 无控制台，双击即打开网页界面。
+- `DirectorAssistant-v0.7.0-win64-console.exe` —— 保留控制台窗口，便于查看日志。
+- `DirectorAssistant-v0.7.0-portable.zip` —— 便携整合包（含 exe / bat / 图标 / 说明 / reverse_prompt 依赖）。
 
 > 首次双击会解压到临时目录，启动慢几秒属正常。用完在网页右上角点「停止服务」。
 
